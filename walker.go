@@ -1,16 +1,16 @@
 package main
 
 import (
-	"runtime"
 	"crypto/sha1"
+	"fmt"
 	"hash"
 	"io"
-	"os"
-	"fmt"
-	"sync"
-	"path/filepath"
-	"sync/atomic"
 	"log"
+	"os"
+	"path/filepath"
+	"runtime"
+	"sync"
+	"sync/atomic"
 )
 
 func printHelp() {
@@ -20,8 +20,6 @@ func printHelp() {
 func parseCommandLine() {
 
 }
-
-
 
 type FileHandler func(filePath string)
 
@@ -34,70 +32,61 @@ type TaskDef struct {
 }
 
 type WorkItem struct {
-	Error   error
-	Name string
+	Error    error
+	Name     string
 	FilePath string
-	Size int64
-	Hash []byte
+	Size     int64
+	Hash     []byte
 }
 
 //
 //	计算文件hash
 //
-func compute(item *WorkItem, h hash.Hash, )  {
+func compute(item *WorkItem, h hash.Hash) {
 
 	f, err := os.Open(item.FilePath)
 	if err != nil {
 		item.Error = err
 		return
 	}
-	defer func () {
+	defer func() {
 		f.Close()
 	}()
-
 
 	h.Reset()
 	io.Copy(h, f)
 	item.Hash = h.Sum(nil)
 }
 
-
 func do(def *TaskDef) {
-
 
 	numCpu := runtime.NumCPU()
 
 	var computeRoutines int32 = 0
 	var pointerComputeRoutines = &computeRoutines
 
-
-
 	outputFile, err := os.Create(def.Output)
 	if err != nil {
 		panic(err)
 	}
-	defer func () {
+	defer func() {
 		outputFile.Close()
 	}()
 
-
-
 	computeWaitGroup := sync.WaitGroup{}
 
-
-	readFileChannel := make(chan *WorkItem, numCpu * 5)
+	readFileChannel := make(chan *WorkItem, numCpu*5)
 	outputChannel := make(chan *WorkItem, 64)
 
-
 	// 有几个CPU核心,就启动几个 goroutine 计算
-	for i:=0; i<numCpu; i++ {
+	for i := 0; i < numCpu; i++ {
 		atomic.AddInt32(pointerComputeRoutines, 1)
 		computeWaitGroup.Add(1)
 		go func() {
 			sha1Hash := sha1.New()
 
 			for {
-				item, ok := <- readFileChannel
+				item, ok := <-readFileChannel
 				if ok {
 					compute(item, sha1Hash)
 					outputChannel <- item
@@ -118,9 +107,9 @@ func do(def *TaskDef) {
 
 	// 启动输出结果 goroutine
 	computeWaitGroup.Add(1)
-	go func () {
+	go func() {
 		for {
-			item, ok:= <- outputChannel
+			item, ok := <-outputChannel
 
 			if ok {
 				if item.Error == nil {
@@ -134,19 +123,17 @@ func do(def *TaskDef) {
 		computeWaitGroup.Done()
 	}()
 
-
 	// 遍历文件
-	err = filepath.Walk(def.Root, func (path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(def.Root, func(path string, info os.FileInfo, err error) error {
 
-		if info.IsDir() {
+		if err != nil || info.IsDir() {
 			return nil
 		}
 		// TODO  排除忽略的文件
 
-		item := WorkItem {
-			Error: err,
+		item := WorkItem{
 			FilePath: path,
-			Size: info.Size(),
+			Size:     info.Size(),
 		}
 
 		readFileChannel <- &item
@@ -154,6 +141,9 @@ func do(def *TaskDef) {
 		return nil
 	})
 
+	if err != nil {
+		log.Printf("Walk Dir '%s' error: %s", def.Root, err.Error())
+	}
 
 	close(readFileChannel)
 
@@ -170,7 +160,6 @@ func main() {
 		Root:     "/Users/wuyongzhi/IdeaProjects/test1/exampleDir",
 		Output:   "walkerOutput.txt",
 	}
-
 
 	do(&def)
 
