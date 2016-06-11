@@ -15,44 +15,6 @@ import (
 	"sync/atomic"
 )
 
-func printHelp() {
-	helperText := `功能:
-	遍历文件夹并计算其中文件的 SHA1 哈希值, 将结果输出到指定文件中
-
-用法:
-	遍历当前目录:
-		hashwalker
-
-	遍历指定目录:
-		hashwalker 目录名
-
-	遍历指定目录,并排除特定文件(支持通配符 *, ?):
-		hashwalker 目录名 --exclude *.txt [模式2,模式3...]
-
-	打印此帮助信息
-
-		hashwalker --help | -? | ?
-
-`
-
-	//log.Println("遍历文件夹并计算其中文件的 SHA1 哈希值, 将结果输出到指定文件中")
-	//log.Println()
-	//log.Println("\t用法: ")
-	//log.Println()
-	//
-	//log.Println("遍历当前目录")
-	//log.Println("\t\thashwalker")
-	//log.Println()
-	//
-	//log.Println("遍历指定目录")
-	//log.Println("\t\thashwalker 目录名 ")
-	//
-	//
-	//log.Println("\t\thashwalker 目录名 --exclude 排除模式1 [排除模式2...] ")
-
-	fmt.Print(helperText)
-}
-
 func parseCommandLine() *TaskDef {
 
 	excludesValue := flag.String("excludes", "", "忽略指定的文件,多个通配符之间用空格分开,并加双引号. 如: -excludes=\"*.jpg *.gif *.png\"")
@@ -78,8 +40,6 @@ func parseCommandLine() *TaskDef {
 
 	return &def
 }
-
-type FileHandler func(filePath string)
 
 type TaskDef struct {
 	Excludes []string
@@ -125,7 +85,7 @@ func do(def *TaskDef) {
 
 	outputFile, err := os.Create(def.Output)
 	if err != nil {
-		panic(err)
+		log.Panic("创建输出文件错误:", err)
 	}
 	defer func() {
 		outputFile.Close()
@@ -211,8 +171,6 @@ func do(def *TaskDef) {
 }
 
 func main() {
-
-	// TODO 处理命令行参数
 
 	def := parseCommandLine()
 
