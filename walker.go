@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 func parseCommandLine() *TaskDef {
@@ -87,7 +88,6 @@ func (me *TaskDef) IsExclude(path string) bool {
 	return false
 }
 
-
 func do(def *TaskDef) {
 
 	numCpu := runtime.NumCPU()
@@ -153,10 +153,6 @@ func do(def *TaskDef) {
 		computeWaitGroup.Done()
 	}()
 
-
-
-	log.Println(def.Excludes)
-
 	// 遍历文件
 	err = filepath.Walk(def.Root, func(path string, info os.FileInfo, err error) error {
 
@@ -164,6 +160,7 @@ func do(def *TaskDef) {
 			return nil
 		}
 
+		// 忽略指定目录或文件
 		if info.IsDir() {
 			if def.IsExclude(path) {
 				return filepath.SkipDir
@@ -200,5 +197,9 @@ func main() {
 		return
 	}
 
+	now := time.Now()
 	do(def)
+	end := time.Now()
+
+	log.Println("总共耗时:", end.Sub(now))
 }
