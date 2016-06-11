@@ -21,6 +21,9 @@ type TaskDef struct {
 	Excludes []string
 	Root     string
 	Output   string
+
+	FileCount   int64		// 记录总供处理了多少文件数量
+	FileSizeSum int64		// 总供处理了多大的字节数量
 }
 
 // 一个小的帮助函数,检查一个指定的路径是否在排除范围内
@@ -152,6 +155,8 @@ func do(def *TaskDef) {
 			if ok {
 				if item.Error == nil {
 					io.WriteString(outputFile, fmt.Sprintf("%s,%x,%d\n", item.FilePath, item.Hash, item.Size))
+					def.FileCount += 1
+					def.FileSizeSum += item.Size
 				}
 			} else {
 				break
@@ -209,5 +214,5 @@ func main() {
 	do(def)
 	end := time.Now()
 
-	log.Println("总共耗时:", end.Sub(now))
+	log.Printf("完成 %d 个文件, 共 %d 字节, 耗时: %v", def.FileCount, def.FileSizeSum, end.Sub(now))
 }
