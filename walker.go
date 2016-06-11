@@ -144,7 +144,8 @@ func do(def *TaskDef) {
 		}()
 	}
 
-	log.Printf("Started %d goroutines.", computeRoutines)
+	log.Println("扫描目录根为: ", def.Root)
+	log.Printf("启动 %d goroutines.", computeRoutines)
 
 	// 启动输出结果 goroutine
 	computeWaitGroup.Add(1)
