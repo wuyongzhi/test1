@@ -16,11 +16,39 @@ import (
 	"time"
 )
 
+// 代表一次任务处理的定义, 包含扫描的根目录, 输出文件名, 排除的文件模式定义
+type TaskDef struct {
+	Excludes []string
+	Root     string
+	Output   string
+}
+
+// 一个小的帮助函数,检查一个指定的路径是否在排除范围内
+func (me *TaskDef) IsExclude(path string) bool {
+	base := filepath.Base(path)
+	for _, exclude := range me.Excludes {
+		if ok, _ := filepath.Match(exclude, base); ok {
+			return true
+		}
+	}
+	return false
+}
+
+// 代表一个文件处理的输入输出项. 输入文件路径,处理结果为哈希值, 文件大小等
+type WorkItem struct {
+	Error    error
+	Name     string
+	FilePath string
+	Size     int64
+	Hash     []byte
+}
+
+// 解析命令行参数,并返回一个 TaskDef 结构. 处理一些默认值的情况
 func parseCommandLine() *TaskDef {
 
 	excludesValue := flag.String("excludes", "", "忽略指定的文件,多个通配符之间用空格分开,并加双引号. 如: -excludes=\"*.jpg *.gif *.png\"")
 	rootValue := flag.String("root", "", "指定根目录,如果不指定,默认使用当前目录")
-	output := flag.String("output", "", "指定输出文件名,如果不指定,默认使用 hashwalker_output.txt")
+	output := flag.String("output", "hashwalker_output.txt", "指定输出文件名,如果不指定,默认使用 hashwalker_output.txt")
 
 	flag.Parse()
 
@@ -36,27 +64,8 @@ func parseCommandLine() *TaskDef {
 	if def.Root == "" {
 		def.Root, _ = os.Getwd()
 	}
-	if def.Output == "" {
-		def.Output = "hashwalker_output.txt"
-	}
 
 	return &def
-}
-
-type TaskDef struct {
-	Excludes []string
-	Root     string
-	Output   string
-
-	readCount int
-}
-
-type WorkItem struct {
-	Error    error
-	Name     string
-	FilePath string
-	Size     int64
-	Hash     []byte
 }
 
 //
@@ -78,16 +87,15 @@ func compute(item *WorkItem, h hash.Hash) {
 	item.Hash = h.Sum(nil)
 }
 
-func (me *TaskDef) IsExclude(path string) bool {
-	base := filepath.Base(path)
-	for _, exclude := range me.Excludes {
-		if ok, _ := filepath.Match(exclude, base); ok {
-			return true
-		}
-	}
-	return false
-}
-
+//
+// 程序核心开始执行的地方, 接受一个 TaskDef 结构, 并依据它来开始处理.
+// 大致逻辑:
+// 1. 创建两条数据管道, 一条用于放置待处理的文件, 一条用于放置处理后的文件.
+// 2. 待处理的文件管道, 输入端由 1 个 goroutine 来处理, 遍历指定目录, 并将符合条件的文件扔进管道中,
+// 		输出端由一批 goroutine来同时处理, goroutine 数量由当前CPU核数来确定. 它们负责从管道中取出待处理文件,并计算HASH值, 然后扔到
+//		处理后的文件管道中
+// 3. 处理后的文件管道, 输入端上面说了, 输出端由 1 个 goroutine 来处理, 从管道中取出处理完的结果, 写入到输出文件中
+//
 func do(def *TaskDef) {
 
 	numCpu := runtime.NumCPU()
