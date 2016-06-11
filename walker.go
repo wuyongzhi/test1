@@ -20,10 +20,11 @@ func parseCommandLine() *TaskDef {
 	excludesValue := flag.String("excludes", "", "忽略指定的文件,多个通配符之间用空格分开,并加双引号. 如: -excludes=\"*.jpg *.gif *.png\"")
 	rootValue := flag.String("root", "", "指定根目录,如果不指定,默认使用当前目录")
 	output := flag.String("output", "", "指定输出文件名,如果不指定,默认使用 hashwalker_output.txt")
-	r := regexp.MustCompile("\\s")
-	excludes := r.Split(*excludesValue, -1)
 
 	flag.Parse()
+
+	r := regexp.MustCompile("\\s")
+	excludes := r.Split(*excludesValue, -1)
 
 	def := TaskDef{
 		Excludes: excludes,
@@ -75,6 +76,17 @@ func compute(item *WorkItem, h hash.Hash) {
 	io.Copy(h, f)
 	item.Hash = h.Sum(nil)
 }
+
+func (me *TaskDef) IsExclude(path string) bool {
+	base := filepath.Base(path)
+	for _, exclude := range me.Excludes {
+		if ok, _ := filepath.Match(exclude, base); ok {
+			return true
+		}
+	}
+	return false
+}
+
 
 func do(def *TaskDef) {
 
@@ -141,14 +153,24 @@ func do(def *TaskDef) {
 		computeWaitGroup.Done()
 	}()
 
+
+
+	log.Println(def.Excludes)
+
 	// 遍历文件
 	err = filepath.Walk(def.Root, func(path string, info os.FileInfo, err error) error {
 
-		if err != nil || info.IsDir() {
+		if err != nil {
 			return nil
 		}
 
-		// TODO  处理跳过忽略的文件
+		if info.IsDir() {
+			if def.IsExclude(path) {
+				return filepath.SkipDir
+			}
+		} else if def.IsExclude(path) {
+			return nil
+		}
 
 		item := WorkItem{
 			FilePath: path,
